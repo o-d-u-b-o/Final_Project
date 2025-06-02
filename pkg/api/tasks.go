@@ -5,7 +5,6 @@ import (
 	"net/http"
 )
 
-// TasksResponse - структура для ответа со списком задач
 type TasksResponse struct {
 	Tasks []*db.Task `json:"tasks"`
 }

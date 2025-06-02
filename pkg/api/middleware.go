@@ -9,13 +9,11 @@ import (
 
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Пропускаем аутентификацию
 		if r.URL.Path == "/api/signin" {
 			next(w, r)
 			return
 		}
 
-		// Проверяем токен
 		tokenString := extractToken(r)
 		if tokenString == "" {
 			writeJSON(w, ErrorResponse{Error: "Authorization token required"}, http.StatusUnauthorized)
@@ -38,7 +36,6 @@ func extractToken(r *http.Request) string {
 		return bearerToken[7:]
 	}
 
-	// Из куки
 	if cookie, err := r.Cookie("token"); err == nil {
 		return cookie.Value
 	}

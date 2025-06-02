@@ -10,6 +10,7 @@ func writeJSON(w http.ResponseWriter, data interface{}, statusCode int) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, PUT, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(data)
 }

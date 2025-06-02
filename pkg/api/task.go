@@ -61,7 +61,6 @@ func handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Обработка даты
 	if task.Date == "" {
 		task.Date = time.Now().Format("20060102")
 	} else {

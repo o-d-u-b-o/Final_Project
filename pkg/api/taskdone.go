@@ -34,7 +34,7 @@ func taskDoneHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if task.Repeat == "" {
-		// Удаляем одноразовую задачу
+		// Удаляем задачу
 		if err := db.DeleteTask(id); err != nil {
 			writeJSON(w, ErrorResponse{Error: err.Error()}, http.StatusInternalServerError)
 			return

@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-// Task представляет структуру задачи
 type Task struct {
 	ID      int64  `json:"id"`
 	Date    string `json:"date"`
@@ -16,7 +15,6 @@ type Task struct {
 	Repeat  string `json:"repeat"`
 }
 
-// Tasks возвращает список задач с поддержкой поиска
 func Tasks(limit int, search string) ([]*Task, error) {
 	var query string
 	var args []interface{}

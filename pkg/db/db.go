@@ -74,7 +74,6 @@ func AddTask(task *Task) (int64, error) {
 	query := `INSERT INTO scheduler (date, title, comment, repeat) 
 	          VALUES (?, ?, ?, ?)`
 
-	// Добавим логирование параметров
 	log.Printf("Adding task: Date=%s, Title=%s, Comment=%s, Repeat=%s",
 		task.Date, task.Title, task.Comment, task.Repeat)
 

@@ -18,7 +18,6 @@ func main() {
 	// Инициализация API обработчиков
 	api.Init()
 
-	// Статические файлы
 	fs := http.FileServer(http.Dir("./web"))
 	http.Handle("/", fs)
 

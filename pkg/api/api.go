@@ -28,7 +28,6 @@ func Init() {
 	http.HandleFunc("/api/tasks", corsHandler(getTaskListHandler))
 	http.HandleFunc("/api/signin", corsHandler(signinHandler))
 	http.HandleFunc("/api/task/done", corsHandler(taskDoneHandler))
-
 	log.Println("API handlers initialized with CORS support")
 }
 
