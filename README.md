@@ -2,8 +2,10 @@
 
 Выполнено большинство заданий со звёздочкой.
 
-В браузере перейти http://localhost:7540/
-
+В браузере перейти:
+  http://localhost:7540/login.html   defaultpassword
+  http://localhost:7540/
+  
 Докер файл соирается, доступен по ссылке:
   https://hub.docker.com/repository/docker/odubo/final_project/general
 
