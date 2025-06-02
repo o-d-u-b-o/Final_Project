@@ -9,7 +9,7 @@ import (
 
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Пропускаем аутентификацию для signin
+		// Пропускаем аутентификацию
 		if r.URL.Path == "/api/signin" {
 			next(w, r)
 			return
@@ -33,7 +33,6 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func extractToken(r *http.Request) string {
-	// Из заголовка Authorization
 	bearerToken := r.Header.Get("Authorization")
 	if len(bearerToken) > 7 && strings.HasPrefix(bearerToken, "Bearer ") {
 		return bearerToken[7:]

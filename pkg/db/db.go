@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -69,9 +70,31 @@ func Close() error {
 	return nil
 }
 
+func AddTask(task *Task) (int64, error) {
+	query := `INSERT INTO scheduler (date, title, comment, repeat) 
+	          VALUES (?, ?, ?, ?)`
+
+	// Добавим логирование параметров
+	log.Printf("Adding task: Date=%s, Title=%s, Comment=%s, Repeat=%s",
+		task.Date, task.Title, task.Comment, task.Repeat)
+
+	res, err := DB.Exec(query, task.Date, task.Title, task.Comment, task.Repeat)
+	if err != nil {
+		return 0, fmt.Errorf("failed to insert task: %w", err)
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
+	}
+
+	log.Printf("Task added successfully, ID=%d", id)
+	return id, nil
+}
+
 func UpdateTaskDate(id int64, date string) error {
 	_, err := DB.Exec(`
-        UPDATE tasks 
+        UPDATE scheduler  // Исправлено 'tasks' на 'scheduler'
         SET date = $1 
         WHERE id = $2`,
 		date, id,

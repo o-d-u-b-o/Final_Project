@@ -16,6 +16,23 @@ type taskResponse struct {
 }
 
 func addTaskHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("AddTask request: Method=%s, Path=%s", r.Method, r.URL.Path)
+
+	if r.Method == http.MethodOptions {
+		log.Println("Handling OPTIONS request")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		log.Printf("Invalid method: %s, expected POST", r.Method)
+		writeJSON(w, taskResponse{Error: "Method not allowed"}, http.StatusMethodNotAllowed)
+		return
+	}
+
 	var task db.Task
 	var response taskResponse
 
