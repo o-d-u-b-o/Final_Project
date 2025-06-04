@@ -26,6 +26,7 @@ type Claims struct {
 
 func GenerateToken() (string, error) {
 	if len(secretKey) == 0 {
+
 		return "", nil
 	}
 

@@ -23,7 +23,6 @@ var (
 	ErrUnsupportedRule = errors.New("unsupported repeat rule")
 )
 
-// NextDate вычисляет следующую дату выполнения задачи
 func NextDate(now time.Time, dateStr, repeat string) (string, error) {
 	if repeat == "" {
 		return "", ErrEmptyRepeat

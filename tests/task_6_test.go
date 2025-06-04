@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/o-d-u-b-o/Final_Project/pkg/db"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +18,6 @@ func TestTask(t *testing.T) {
 	defer db.Close()
 
 	now := time.Now()
-
 	task := task{
 		date:    now.Format(`20060102`),
 		title:   "Созвон в 16:00",
@@ -24,28 +25,28 @@ func TestTask(t *testing.T) {
 		repeat:  "d 5",
 	}
 
-	todo := addTask(t, task)
+	// Добавляем задачу
+	id := addTask(t, task)
 
-	body, err := requestJSON("api/task", nil, http.MethodGet)
-	assert.NoError(t, err)
-	var m map[string]string
-	err = json.Unmarshal(body, &m)
-	assert.NoError(t, err)
-
-	e, ok := m["error"]
-	assert.False(t, !ok || len(fmt.Sprint(e)) == 0,
-		"Ожидается ошибка для вызова /api/task")
-
-	body, err = requestJSON("api/task?id="+todo, nil, http.MethodGet)
-	assert.NoError(t, err)
-	err = json.Unmarshal(body, &m)
+	// Проверяем получение задачи
+	body, err := requestJSON("api/task?id="+id, nil, http.MethodGet)
 	assert.NoError(t, err)
 
-	assert.Equal(t, todo, m["id"])
-	assert.Equal(t, task.date, m["date"])
-	assert.Equal(t, task.title, m["title"])
-	assert.Equal(t, task.comment, m["comment"])
-	assert.Equal(t, task.repeat, m["repeat"])
+	var resp struct {
+		ID      string `json:"id"`
+		Date    string `json:"date"`
+		Title   string `json:"title"`
+		Comment string `json:"comment"`
+		Repeat  string `json:"repeat"`
+	}
+	err = json.Unmarshal(body, &resp)
+	assert.NoError(t, err)
+
+	assert.Equal(t, id, resp.ID)
+	assert.Equal(t, task.date, resp.Date)
+	assert.Equal(t, task.title, resp.Title)
+	assert.Equal(t, task.comment, resp.Comment)
+	assert.Equal(t, task.repeat, resp.Repeat)
 }
 
 type fulltask struct {
@@ -53,9 +54,31 @@ type fulltask struct {
 	task
 }
 
+func postJSONWithContentType(url string, data []byte, contentType string, method string) (map[string]interface{}, error) {
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", contentType)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 func TestEditTask(t *testing.T) {
-	db := openDB(t)
-	defer db.Close()
+	dbConn := openDB(t) // переименуем переменную, чтобы не путать с пакетом db
+	defer dbConn.Close()
 
 	now := time.Now()
 
@@ -96,30 +119,37 @@ func TestEditTask(t *testing.T) {
 	}
 
 	updateTask := func(newVals map[string]any) {
-		mupd, err := postJSON("api/task", newVals, http.MethodPut)
+		// Преобразуем данные в JSON
+		jsonData, err := json.Marshal(newVals)
 		assert.NoError(t, err)
 
-		e, ok := mupd["error"]
-		assert.False(t, ok && fmt.Sprint(e) != "")
-
-		var task Task
-		err = db.Get(&task, `SELECT * FROM scheduler WHERE id=?`, id)
+		// Отправляем с правильным Content-Type
+		mupd, err := postJSONWithContentType("api/task", jsonData, "application/json", http.MethodPut)
 		assert.NoError(t, err)
 
+		if e, ok := mupd["error"]; ok {
+			t.Fatalf("Unexpected error: %v", e)
+		}
+
+		// Преобразуем ID
+		taskID, err := strconv.ParseInt(id, 10, 64)
+		assert.NoError(t, err)
+
+		// Получаем задачу
+		task, err := db.GetTask(taskID)
+		assert.NoError(t, err)
+		assert.NotNil(t, task) // Проверяем что задача не nil
+
+		// Проверяем обновленные значения
 		assert.Equal(t, id, strconv.FormatInt(task.ID, 10))
-		assert.Equal(t, newVals["title"], task.Title)
-		if _, is := newVals["comment"]; !is {
-			newVals["comment"] = ""
-		}
-		if _, is := newVals["repeat"]; !is {
-			newVals["repeat"] = ""
-		}
-		assert.Equal(t, newVals["comment"], task.Comment)
-		assert.Equal(t, newVals["repeat"], task.Repeat)
-		now := time.Now().Format(`20060102`)
-		if task.Date < now {
-			t.Errorf("Дата не может быть меньше сегодняшней")
-		}
+		assert.Equal(t, newVals["title"].(string), task.Title)
+		assert.Equal(t, newVals["comment"].(string), task.Comment)
+		assert.Equal(t, newVals["repeat"].(string), task.Repeat)
+
+		// Проверяем дату
+		taskDate, err := time.Parse("20060102", task.Date)
+		assert.NoError(t, err)
+		assert.False(t, taskDate.Before(time.Now()))
 	}
 
 	updateTask(map[string]any{

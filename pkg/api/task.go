@@ -41,15 +41,32 @@ func handleGetTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, task, http.StatusOK)
+	// Возвращаем задачу в правильном формате
+	response := map[string]string{
+		"id":      strconv.FormatInt(task.ID, 10),
+		"date":    task.Date,
+		"title":   task.Title,
+		"comment": task.Comment,
+		"repeat":  task.Repeat,
+	}
+	writeJSON(w, response, http.StatusOK)
 }
 
 func handleUpdateTask(w http.ResponseWriter, r *http.Request) {
-	var task db.Task
-	if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
-		writeJSON(w, ErrorResponse{Error: "Invalid JSON format"}, http.StatusBadRequest)
+	// Проверяем Content-Type
+	if r.Header.Get("Content-Type") != "application/json" {
+		writeJSON(w, ErrorResponse{Error: "Content-Type must be application/json"},
+			http.StatusBadRequest)
 		return
 	}
+
+	var task db.Task
+	if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
+		writeJSON(w, ErrorResponse{Error: "Invalid JSON format: " + err.Error()},
+			http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
 
 	if task.ID == 0 {
 		writeJSON(w, ErrorResponse{Error: "Task ID is required"}, http.StatusBadRequest)
@@ -61,7 +78,6 @@ func handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Обработка даты
 	if task.Date == "" {
 		task.Date = time.Now().Format("20060102")
 	} else {
@@ -76,7 +92,8 @@ func handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, struct{}{}, http.StatusOK)
+	// Возвращаем пустой успешный ответ
+	writeJSON(w, map[string]interface{}{}, http.StatusOK)
 }
 
 // Добавляем новый обработчик для удаления задач
