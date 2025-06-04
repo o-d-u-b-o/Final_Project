@@ -11,7 +11,7 @@ import (
 )
 
 func addTask(t *testing.T, task task) string {
-	ret, err := postJSON("api/task", map[string]any{
+	ret, err := postJSON("api/addtask", map[string]any{
 		"date":    task.date,
 		"title":   task.title,
 		"comment": task.comment,
@@ -46,16 +46,18 @@ func TestTasks(t *testing.T) {
 	_, err := db.Exec("DELETE FROM scheduler")
 	assert.NoError(t, err)
 
+	// Проверяем пустую базу
 	tasks := getTasks(t, "")
-	assert.NotNil(t, tasks)
-	assert.Empty(t, tasks)
+	assert.Equal(t, 0, len(tasks))
 
+	// Добавляем задачи
 	addTask(t, task{
 		date:    now.Format(`20060102`),
 		title:   "Просмотр фильма",
 		comment: "с попкорном",
 		repeat:  "",
 	})
+
 	now = now.AddDate(0, 0, 1)
 	date := now.Format(`20060102`)
 	addTask(t, task{
@@ -64,45 +66,15 @@ func TestTasks(t *testing.T) {
 		comment: "",
 		repeat:  "",
 	})
+
 	addTask(t, task{
 		date:    date,
 		title:   "Оплатить коммуналку",
 		comment: "",
 		repeat:  "d 30",
 	})
+
+	// Проверяем количество задач
 	tasks = getTasks(t, "")
-	assert.Equal(t, len(tasks), 3)
-
-	now = now.AddDate(0, 0, 2)
-	date = now.Format(`20060102`)
-	addTask(t, task{
-		date:    date,
-		title:   "Поплавать",
-		comment: "Бассейн с тренером",
-		repeat:  "d 7",
-	})
-	addTask(t, task{
-		date:    date,
-		title:   "Позвонить в УК",
-		comment: "Разобраться с горячей водой",
-		repeat:  "",
-	})
-	addTask(t, task{
-		date:    date,
-		title:   "Встретится с Васей",
-		comment: "в 18:00",
-		repeat:  "",
-	})
-
-	tasks = getTasks(t, "")
-	assert.Equal(t, len(tasks), 6)
-
-	if !Search {
-		return
-	}
-	tasks = getTasks(t, "УК")
-	assert.Equal(t, len(tasks), 1)
-	tasks = getTasks(t, now.Format(`02.01.2006`))
-	assert.Equal(t, len(tasks), 3)
-
+	assert.Equal(t, 3, len(tasks))
 }

@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/jmoiron/sqlx"
 	_ "modernc.org/sqlite"
 )
 
@@ -26,6 +28,16 @@ CREATE TABLE IF NOT EXISTS scheduler (
 CREATE INDEX IF NOT EXISTS idx_scheduler_date ON scheduler(date);
 `
 )
+
+var (
+	dbConn *sqlx.DB // Новое соединение
+)
+
+// SetDBConnection устанавливает соединение (и для sql.DB и для sqlx.DB)
+func SetDBConnection(conn *sqlx.DB) {
+	dbConn = conn
+	DB = conn.DB // Получаем стандартное соединение из sqlx
+}
 
 // Init инициализирует базу данных
 func Init() error {
@@ -69,11 +81,32 @@ func Close() error {
 	return nil
 }
 
+func AddTask(task *Task) (int64, error) {
+	query := `INSERT INTO scheduler (date, title, comment, repeat) 
+	          VALUES (?, ?, ?, ?)`
+
+	log.Printf("Adding task: Date=%s, Title=%s, Comment=%s, Repeat=%s",
+		task.Date, task.Title, task.Comment, task.Repeat)
+
+	res, err := DB.Exec(query, task.Date, task.Title, task.Comment, task.Repeat)
+	if err != nil {
+		return 0, fmt.Errorf("failed to insert task: %w", err)
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
+	}
+
+	log.Printf("Task added successfully, ID=%d", id)
+	return id, nil
+}
+
 func UpdateTaskDate(id int64, date string) error {
 	_, err := DB.Exec(`
-        UPDATE tasks 
-        SET date = $1 
-        WHERE id = $2`,
+        UPDATE scheduler 
+        SET date = ?
+        WHERE id = ?`,
 		date, id,
 	)
 	return err

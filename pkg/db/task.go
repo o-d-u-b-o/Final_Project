@@ -3,11 +3,11 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
 
-// Task представляет структуру задачи
 type Task struct {
 	ID      int64  `json:"id"`
 	Date    string `json:"date"`
@@ -16,25 +16,6 @@ type Task struct {
 	Repeat  string `json:"repeat"`
 }
 
-// AddTask добавляет новую задачу в базу данных
-func AddTask(task *Task) (int64, error) {
-	query := `INSERT INTO scheduler (date, title, comment, repeat) 
-	          VALUES (?, ?, ?, ?)`
-
-	res, err := DB.Exec(query, task.Date, task.Title, task.Comment, task.Repeat)
-	if err != nil {
-		return 0, fmt.Errorf("failed to insert task: %w", err)
-	}
-
-	id, err := res.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
-	}
-
-	return id, nil
-}
-
-// Tasks возвращает список задач с поддержкой поиска
 func Tasks(limit int, search string) ([]*Task, error) {
 	var query string
 	var args []interface{}
@@ -148,6 +129,12 @@ func GetTask(id int64) (*Task, error) {
 
 // UpdateTask обновляет существующую задачу
 func UpdateTask(task *Task) error {
+	if task.ID == 0 {
+		return fmt.Errorf("task ID is required")
+	}
+	if task.Title == "" {
+		return fmt.Errorf("title cannot be empty")
+	}
 	query := `UPDATE scheduler 
 	          SET date = ?, title = ?, comment = ?, repeat = ? 
 	          WHERE id = ?`
@@ -170,6 +157,122 @@ func UpdateTask(task *Task) error {
 
 	if rowsAffected == 0 {
 		return fmt.Errorf("task not found")
+	}
+
+	return nil
+}
+
+func NextDate(currentDate, repeatRule string) (string, error) {
+	if repeatRule == "" {
+		return "", fmt.Errorf("empty repeat rule")
+	}
+
+	currentTime, err := time.Parse("20060102", currentDate)
+	if err != nil {
+		return "", fmt.Errorf("invalid current date format: %v", err)
+	}
+
+	parts := strings.Fields(repeatRule)
+	if len(parts) < 2 {
+		return "", fmt.Errorf("invalid repeat rule format")
+	}
+
+	switch parts[0] {
+	case "d": // Ежедневное повторение
+		return dailyRepeat(currentTime, parts[1])
+	case "w": // Еженедельное повторение
+		return weeklyRepeat(currentTime, parts[1])
+	case "m": // Ежемесячное повторение
+		return monthlyRepeat(currentTime, parts[1])
+	case "y": // Ежегодное повторение
+		return yearlyRepeat(currentTime, parts[1])
+	default:
+		return "", fmt.Errorf("unsupported repeat rule: %s", parts[0])
+	}
+}
+
+// dailyRepeat вычисляет следующую дату для ежедневного повторения
+func dailyRepeat(currentTime time.Time, interval string) (string, error) {
+	days, err := strconv.Atoi(interval)
+	if err != nil {
+		return "", fmt.Errorf("invalid days interval: %v", err)
+	}
+	if days <= 0 {
+		return "", fmt.Errorf("days interval must be positive")
+	}
+	return currentTime.AddDate(0, 0, days).Format("20060102"), nil
+}
+
+// weeklyRepeat вычисляет следующую дату для еженедельного повторения
+func weeklyRepeat(currentTime time.Time, interval string) (string, error) {
+	weeks, err := strconv.Atoi(interval)
+	if err != nil {
+		return "", fmt.Errorf("invalid weeks interval: %v", err)
+	}
+	if weeks <= 0 {
+		return "", fmt.Errorf("weeks interval must be positive")
+	}
+	return currentTime.AddDate(0, 0, 7*weeks).Format("20060102"), nil
+}
+
+// monthlyRepeat вычисляет следующую дату для ежемесячного повторения
+func monthlyRepeat(currentTime time.Time, interval string) (string, error) {
+	months, err := strconv.Atoi(interval)
+	if err != nil {
+		return "", fmt.Errorf("invalid months interval: %v", err)
+	}
+	if months <= 0 {
+		return "", fmt.Errorf("months interval must be positive")
+	}
+
+	// Сохраняем день месяца (если он есть в следующем месяце)
+	nextDate := currentTime.AddDate(0, months, 0)
+
+	// Если день месяца превышает количество дней в следующем месяце,
+	// берем последний день месяца
+	if currentTime.Day() != nextDate.Day() {
+		nextDate = time.Date(nextDate.Year(), nextDate.Month()+1, 0, 0, 0, 0, 0, time.UTC)
+	}
+
+	return nextDate.Format("20060102"), nil
+}
+
+// yearlyRepeat вычисляет следующую дату для ежегодного повторения
+func yearlyRepeat(currentTime time.Time, interval string) (string, error) {
+	years, err := strconv.Atoi(interval)
+	if err != nil {
+		return "", fmt.Errorf("invalid years interval: %v", err)
+	}
+	if years <= 0 {
+		return "", fmt.Errorf("years interval must be positive")
+	}
+	return currentTime.AddDate(years, 0, 0).Format("20060102"), nil
+}
+
+func MarkTaskDone(id int64) error {
+	// Получаем задачу из БД
+	task, err := GetTask(id)
+	if err != nil {
+		return fmt.Errorf("failed to get task: %w", err)
+	}
+
+	// Для непериодических задач просто удаляем
+	if task.Repeat == "" {
+		if err := DeleteTask(id); err != nil {
+			return fmt.Errorf("failed to delete task: %w", err)
+		}
+		return nil
+	}
+
+	// Для периодических задач вычисляем следующую дату
+	nextDate, err := NextDate(task.Date, task.Repeat)
+	if err != nil {
+		return fmt.Errorf("failed to calculate next date: %w", err)
+	}
+
+	// Обновляем дату задачи
+	if err := UpdateTaskDate(id, nextDate); err != nil {
+		return fmt.Errorf("failed to update task date: %w", err)
 	}
 
 	return nil
