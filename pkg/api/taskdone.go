@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -26,7 +27,6 @@ func taskDoneHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем текущую задачу
 	task, err := db.GetTask(id)
 	if err != nil {
 		writeJSON(w, ErrorResponse{Error: err.Error()}, http.StatusNotFound)
@@ -34,25 +34,30 @@ func taskDoneHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if task.Repeat == "" {
-		// Удаляем задачу
 		if err := db.DeleteTask(id); err != nil {
+			log.Printf("Delete failed: %v", err)
 			writeJSON(w, ErrorResponse{Error: err.Error()}, http.StatusInternalServerError)
 			return
 		}
 	} else {
-		// Обновляем дату для периодической задачи
-		now := time.Now()
+		now := time.Now().UTC()
+		log.Printf("Calculating next date for task %d (date: %s, repeat: %s)",
+			id, task.Date, task.Repeat)
+
 		nextDateStr, err := NextDate(now, task.Date, task.Repeat)
 		if err != nil {
+			log.Printf("NextDate error: %v", err)
 			writeJSON(w, ErrorResponse{Error: err.Error()}, http.StatusBadRequest)
 			return
 		}
 
+		log.Printf("Updating task %d to new date: %s", id, nextDateStr)
 		if err := db.UpdateTaskDate(id, nextDateStr); err != nil {
+			log.Printf("Update failed: %v", err)
 			writeJSON(w, ErrorResponse{Error: err.Error()}, http.StatusInternalServerError)
 			return
 		}
 	}
 
-	writeJSON(w, struct{}{}, http.StatusOK)
+	writeJSON(w, map[string]interface{}{}, http.StatusOK)
 }

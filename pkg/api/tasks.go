@@ -3,6 +3,7 @@ package api
 import (
 	"go1f/pkg/db"
 	"net/http"
+	"strconv"
 )
 
 type TasksResponse struct {
@@ -26,5 +27,17 @@ func getTaskListHandler(w http.ResponseWriter, r *http.Request) {
 		tasks = make([]*db.Task, 0)
 	}
 
-	writeJSON(w, TasksResponse{Tasks: tasks}, http.StatusOK)
+	// Преобразуем задачи в нужный формат
+	var response []map[string]string
+	for _, t := range tasks {
+		response = append(response, map[string]string{
+			"id":      strconv.FormatInt(t.ID, 10),
+			"date":    t.Date,
+			"title":   t.Title,
+			"comment": t.Comment,
+			"repeat":  t.Repeat,
+		})
+	}
+
+	writeJSON(w, map[string]interface{}{"tasks": response}, http.StatusOK)
 }

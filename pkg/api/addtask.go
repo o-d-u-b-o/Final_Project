@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"go1f/pkg/db"
@@ -51,7 +52,7 @@ func addTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	if err := processTaskDate(&task, now); err != nil {
 		log.Printf("Date processing error: %v", err)
 		response.Error = err.Error()
@@ -73,29 +74,51 @@ func addTaskHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func processTaskDate(task *db.Task, now time.Time) error {
-	// Если дата не указана - используем сегодня
-	if task.Date == "" {
-		task.Date = now.Format(dateFormat)
+	log.Printf("Input - Date: '%s', Title: '%s', Repeat: '%s'",
+		task.Date, task.Title, task.Repeat)
+	log.Printf("Current time: %s", now.Format("20060102"))
+
+	// 1. Явная обработка "today"
+	if strings.EqualFold(task.Date, "today") {
+		task.Date = now.Format("20060102")
+		log.Printf("Today case - Setting date to: %s", task.Date)
 		return nil
 	}
 
-	// Парсим дату
-	date, err := time.Parse(dateFormat, task.Date)
+	// 2. Обработка пустой даты
+	if task.Date == "" {
+		task.Date = now.Format("20060102")
+		log.Printf("Empty date case - Setting date to: %s", task.Date)
+		return nil
+	}
+
+	// 3. Для явных дат
+	date, err := time.Parse("20060102", task.Date)
 	if err != nil {
 		return fmt.Errorf("invalid date format, expected YYYYMMDD")
 	}
 
-	// Если дата в прошлом и есть правило повторения
-	if date.Before(now) && task.Repeat != "" {
-		next, err := NextDate(now, task.Date, task.Repeat)
-		if err != nil {
-			return err
+	// Измененная логика: не считаем сегодняшнюю дату "прошедшей"
+	if date.Before(now) && !isSameDay(date, now) {
+		if task.Repeat != "" {
+			next, err := NextDate(now, task.Date, task.Repeat)
+			if err != nil {
+				return err
+			}
+			task.Date = next
+			log.Printf("Repeating task - New date: %s", task.Date)
+		} else {
+			task.Date = now.Format("20060102")
+			log.Printf("Past date without repeat - Setting to today: %s", task.Date)
 		}
-		task.Date = next
-	} else if date.Before(now) {
-		// Если дата в прошлом и нет правила повторения - используем сегодня
-		task.Date = now.Format(dateFormat)
 	}
 
+	log.Printf("Output - Final date: %s", task.Date)
 	return nil
+}
+
+func isSameDay(t1, t2 time.Time) bool {
+	return t1.Year() == t2.Year() &&
+		t1.Month() == t2.Month() &&
+		t1.Day() == t2.Day()
 }
